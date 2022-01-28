@@ -1,0 +1,54 @@
+WITH
+  socios_acum AS (
+  SELECT
+    DISTINCT(socios_acum.member_id)
+  FROM
+    `datadomain-prod-qi8z.dmt_ffp_us.cus_ffp_trxn_accr` SOCIOS_ACUM
+  WHERE
+    1=1
+    AND transaction_status_desc != 'Cancelled'
+    AND subtype_desc != 'Cancelled'
+    AND original_type_desc = 'ACCRUAL'
+    AND transaction_dt BETWEEN '2021-01-01'AND '2021-12-31'
+    AND root_system = 'Siebel_BR'
+    AND product_category NOT LIKE 'REVALIDACAO DE PONTOS%'
+    AND product_category NOT LIKE 'COMPENSACAO SISTEMA MPLU'
+    ), SOCIOS_ACUMa AS (
+SELECT
+  COUNT(DISTINCT(socios_resgates.member_id))
+FROM
+  `datadomain-prod-qi8z.dmt_ffp_us.cus_ffp_trxn_rdmp` SOCIOS_RESGATES
+LEFT JOIN
+  Socios_acum 
+ON
+  SOCIOS_RESGATES.member_id = socios_acum.member_id
+WHERE
+  1=1
+  AND transaction_status_desc != 'Cancelled'
+  AND transaction_dt BETWEEN '2021-01-01' AND '2021-12-31'
+  AND subtype_desc != 'Cancelled'
+  AND original_type_desc = 'REDEMPTION'
+  AND segment_desc IN ('Canje Aéreo',
+    'Canje no Aéreo')
+  AND root_system = 'Siebel_BR'
+  AND unit_qty > 0
+  AND socios_resgates.member_id IS NOT NULL
+   AND socios_acum.member_id is null)
+SELECT
+    COUNT(DISTINCT(socios_antigos.member_id))
+  FROM
+    `datadomain-prod-qi8z.dmt_ffp_us.cus_ffp_trxn_accr` socios_antigos
+    LEFT JOIN socios_acum
+    ON SOCIOS_ACUM.member_id = socios_antigos.member_id
+  WHERE
+    1=1
+    AND transaction_status_desc != 'Cancelled'
+    AND subtype_desc != 'Cancelled'
+    AND original_type_desc = 'ACCRUAL'
+    AND transaction_dt BETWEEN '2020-01-01'AND '2020-12-31'
+    AND root_system = 'Siebel_BR'
+    AND product_category NOT LIKE 'REVALIDACAO DE PONTOS%'
+    AND product_category NOT LIKE 'COMPENSACAO SISTEMA MPLU'
+    AND partner_group_desc LIKE '%LIVELO%'
+    AND socios_acum.member_id is null
+    
