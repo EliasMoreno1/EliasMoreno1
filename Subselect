@@ -1,0 +1,33 @@
+WITH
+ clube AS (
+      SELECT member_id
+  FROM `bc-te-dlake-prod-21x6.mst_entity_loyalty_program_us.club_mplus_affiliated`
+WHERE
+  affiliate_cancel_dt IS NULL
+  AND status_desc = 'Ativa'
+ AND member_id IS NOT NULL
+ Group BY 1
+ )--,Pontos_acumulados as (
+  SELECT
+  COUNT(DISTINCT acum.member_id) socios_ipi,
+  COUNT(DISTINCT camp.member_id) socios_ipi_clube
+  FROM
+    datadomain-prod-qi8z.dmt_ffp_us.cus_ffp_trxn_accr acum
+    LEFT JOIN `bc-te-dlake-prod-21x6.mst_entity_loyalty_program_us.member` member
+    ON member.member_id = acum.member_id
+    LEFT JOIN clube  camp
+    ON SUBSTR(member.member_id_sinc,5)  = camp.member_id
+  WHERE
+   transaction_dt BETWEEN '2021-01-01'
+    AND CURRENT_DATE()
+    -- AND partner_group_desc NOT LIKE 'ABASTECE AI'
+   -- AND partner_group_desc LIKE 'COMPRA DE PONTOS%'
+  --  AND partner_macrogroup_desc LIKE '%T&E%'
+  and partner_group_desc LIKE '%CLUBE%'
+
+    AND transaction_status_desc != 'Cancelled'
+    AND subtype_desc != 'Cancelled'
+    AND original_type_desc = 'ACCRUAL'
+    AND acum.root_system = 'Siebel_BR'
+    AND product_category NOT LIKE 'REVALIDACAO DE PONTOS%'
+    AND product_category NOT LIKE 'COMPENSACAO SISTEMA MPLU'
