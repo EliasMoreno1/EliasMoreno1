@@ -1,0 +1,46 @@
+WITH Socios_Campanha AS (
+    SELECT   
+        member_id,
+        MIN(transaction_dt) primera_acum_camp
+    FROM `so-os-ffpanalytics-dev.loyalty_insights.campaign_accrual_insights`
+    WHERE 1=1
+    AND campaign_name LIKE 'LIVELO | BUMERANGUE | SET21'
+    GROUP BY 1
+), estado_socio AS (
+    SELECT 
+        txn_acc.member_id,
+        MIN(DATE(transaction_dt)) primera_acc,
+        MAX(DATE(transaction_dt)) ultima_acc,
+        DATE_DIFF('2021-10-01',MAX(DATE(transaction_dt)), MONTH) months
+    FROM `datadomain-prod-qi8z.dmt_ffp_us.cus_ffp_trxn_accr` txn_acc
+    LEFT JOIN Socios_Campanha camp
+    ON txn_acc.member_id = camp.member_id
+    AND DATE(txn_acc.transaction_dt) < DATE(camp.primera_acum_camp)
+    WHERE 1=1
+    AND transaction_status_desc != 'Cancelled'
+    AND subtype_desc != 'Cancelled'
+    AND original_type_desc = 'ACCRUAL'
+    AND txn_acc.root_system = 'Siebel_BR'
+    AND product_category NOT LIKE 'REVALIDACAO DE PONTOS%'
+    AND product_category NOT LIKE 'COMPENSACAO SISTEMA MPLU'
+    AND camp.member_id IS NOT NULL
+    AND txn_acc.partner_group_desc = 'LIVELO'
+    GROUP BY 1
+), clasificacion AS (
+SELECT  
+    camp.member_id,
+    CASE
+        WHEN months IS NULL THEN 'Nuevo'
+        WHEN months <= 12 THEN 'Activo'
+        WHEN months BETWEEN 13 AND 24 THEN 'Inactivo'
+        WHEN months > 24 THEN 'ExParticipante'
+    END clas
+FROM Socios_Campanha camp
+LEFT JOIN estado_socio
+ON camp.member_id = estado_socio.member_id
+)
+SELECT 
+    clas,
+    COUNT(DISTINCT member_id)
+FROM clasificacion
+GROUP BY 1
