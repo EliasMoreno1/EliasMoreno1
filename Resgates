@@ -1,0 +1,32 @@
+WITH Socios_Campanha AS (
+    SELECT   
+        member_id,
+        MIN(transaction_dt) primera_acum_camp
+    FROM `so-os-ffpanalytics-dev.loyalty_insights.campaign_accrual_insights`
+    WHERE 1=1
+    AND campaign_name LIKE 'LIVELO | BUMERANGUE | SET21'
+    GROUP BY 1
+)
+SELECT 
+    CASE 
+        WHEN segment_desc = 'Canje no Aéreo' THEN 'CNA'
+        WHEN segment_desc = 'Canje Aéreo' AND route_type_desc LIKE 'DOM%' THEN 'CA DOM'
+        WHEN segment_desc = 'Canje Aéreo' AND route_type_desc IN ('LH','REG') THEN 'CA INT'
+        WHEN segment_desc = 'Canje Aéreo' AND route_type_desc IS NULL THEN 'CA'
+    END tipo_resgate,
+    COUNT(DISTINCT txn_rdmp.member_id) socios_unicos,
+    SUM(unit_qty) puntos_resgatados,
+    COUNT(*) resgates
+FROM  `datadomain-prod-qi8z.dmt_ffp_us.cus_ffp_trxn_rdmp` txn_rdmp
+LEFT JOIN Socios_Campanha camp
+ON txn_rdmp.member_id = camp.member_id
+AND DATE(txn_rdmp.transaction_dt) >= DATE(camp.primera_acum_camp) 
+WHERE 1=1
+AND transaction_status_desc != 'Cancelled'
+AND subtype_desc != 'Cancelled'
+AND original_type_desc = 'REDEMPTION'
+AND segment_desc IN ('Canje Aéreo','Canje no Aéreo')
+AND txn_rdmp.root_system = 'Siebel_BR'
+AND unit_qty > 0
+AND camp.member_id IS NOT NULL
+GROUP BY 1
