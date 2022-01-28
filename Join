@@ -1,0 +1,72 @@
+WITH
+  clube AS (
+  SELECT
+    member_id
+  FROM
+    `bc-te-dlake-prod-21x6.mst_entity_loyalty_program_us.club_mplus_affiliated`
+  WHERE
+    affiliate_cancel_dt IS NULL
+    AND status_desc = 'Ativa'
+    AND member_id IS NOT NULL
+  GROUP BY
+    1 ),
+  cobranded AS (
+  SELECT
+    DISTINCT(member_id) Total_cobranded
+  FROM
+    datadomain-prod-qi8z.dmt_ffp_us.cus_ffp_trxn_accr cob
+  WHERE
+    1=1
+    AND transaction_dt BETWEEN '2021-01-01'
+    AND CURRENT_DATE()
+    AND transaction_status_desc != 'Cancelled'
+    AND subtype_desc != 'Cancelled'
+    AND original_type_desc = 'ACCRUAL'
+    AND root_system = 'Siebel_BR'
+    AND partner_macrogroup_desc = 'COBRANDED' 
+  
+    AND member_id IS NOT NULL ),
+   resgates AS (
+  SELECT
+    DISTINCT (cft.member_id) total_resgates
+  FROM
+    datadomain-prod-qi8z.dmt_ffp_us.cus_ffp_trxn_rdmp cft
+ 
+  WHERE
+    1=1 
+   -- AND partner_group_desc LIKE '%ABASTECE AI%' 
+   -- AND partner_macrogroup_desc LIKE '%PESSOA FISICA%' 
+    AND transaction_dt BETWEEN '2021-01-01'
+    AND CURRENT_DATE()
+    AND original_type_desc = 'REDEMPTION'
+    AND segment_desc IN ('Canje Aéreo',
+      'Canje no Aéreo')
+    AND original_type_desc = 'REDEMPTION' )
+SELECT
+  COUNT(DISTINCT(accr.member_id))SOCIOS_ACUMULACION,
+  COUNT(DISTINCT(camp.member_id)) SOCIOS_CLUBE,
+  COUNT(DISTINCT cobranded.Total_cobranded ) SOCIOS_COBRANDED,
+  COUNT(DISTINCT resgates.total_resgates ) SOCIOS_RESGATES
+FROM
+  datadomain-prod-qi8z.dmt_ffp_us.cus_ffp_trxn_accr accr
+LEFT JOIN `bc-te-dlake-prod-21x6.mst_entity_loyalty_program_us.member` member
+    ON member.member_id = accr.member_id
+    LEFT JOIN clube  camp
+    ON SUBSTR(member.member_id_sinc,5)  = camp.member_id
+LEFT JOIN
+  cobranded
+ON
+  cobranded.Total_cobranded = accr.member_id
+LEFT JOIN
+  resgates
+ON
+  resgates.total_resgates = accr.member_id
+WHERE
+  1=1
+  AND transaction_dt BETWEEN '2021-01-01'
+  AND CURRENT_DATE()
+  AND transaction_status_desc != 'Cancelled'
+  AND subtype_desc != 'Cancelled'
+  AND original_type_desc = 'ACCRUAL'
+  AND accr.root_system = 'Siebel_BR'
+  AND partner_group_desc = 'ABASTECE AI'
